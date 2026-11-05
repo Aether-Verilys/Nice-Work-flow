@@ -1,0 +1,41 @@
+name: Publish Release
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Stable tag to create from main (v1.2.3)
+        required: true
+        type: string
+permissions: {contents: write}
+concurrency: {group: publish-release, cancel-in-progress: false}
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with: {ref: main}
+      - name: Validate tag and source version
+        run: ./scripts/release-check.sh "$RELEASE_TAG"
+      - name: Run tests
+        run: ./scripts/test.sh
+      - name: Build release assets
+        run: ./scripts/build-release.sh "$RELEASE_TAG"
+      - name: Create draft and upload assets
+        run: |
+          gh release create "$RELEASE_TAG" --target "$(git rev-parse HEAD)" --title "$RELEASE_TAG" --generate-notes --draft
+          gh release upload "$RELEASE_TAG" release-assets/*
+          gh release edit "$RELEASE_TAG" --draft=false
+      - name: Notify Feishu
+        if: always() && secrets.FEISHU_WEBHOOK_TOKEN != ''
+        uses: ./.github/actions/feishu-notify
+        env: {FEISHU_WEBHOOK_TOKEN: ${{ secrets.FEISHU_WEBHOOK_TOKEN }}}
+        with:
+          webhook_token: ${{ secrets.FEISHU_WEBHOOK_TOKEN }}
+          title: Release ${{ inputs.release_tag }}
+          description: GitHub Release published from main.
+          link_text: Open release
+          link_url: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.release_tag }}
+          status: ${{ job.status == 'success' && 'success' || 'error' }}

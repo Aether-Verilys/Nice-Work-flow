@@ -1,0 +1,33 @@
+name: Distribute Release
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag: {description: Published release tag, required: true, type: string}
+      upload_s3: {description: Upload S3, required: true, default: true, type: boolean}
+      upload_oss: {description: Upload OSS, required: true, default: false, type: boolean}
+      update_latest: {description: Update latest aliases, required: true, default: true, type: boolean}
+permissions: {contents: read}
+concurrency: {group: distribute-release, cancel-in-progress: false}
+jobs:
+  distribute:
+    if: inputs.upload_s3 || inputs.upload_oss
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download and validate published assets
+        run: ./scripts/download-and-validate-release.sh "$RELEASE_TAG"
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
+      - name: Upload selected destinations
+        run: ./scripts/upload-release.sh "$RELEASE_TAG" "${{ inputs.upload_s3 }}" "${{ inputs.upload_oss }}" "${{ inputs.update_latest }}"
+      - name: Notify Feishu
+        if: always() && secrets.FEISHU_WEBHOOK_TOKEN != ''
+        uses: ./.github/actions/feishu-notify
+        with:
+          webhook_token: ${{ secrets.FEISHU_WEBHOOK_TOKEN }}
+          title: Distribution ${{ inputs.release_tag }}
+          description: Release distribution finished with status `${{ job.status }}`.
+          link_text: Open workflow
+          link_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          status: ${{ job.status == 'success' && 'success' || 'error' }}
