@@ -18,11 +18,10 @@ jobs:
         run: ./scripts/download-and-validate-release.sh "$RELEASE_TAG"
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
-          GH_TOKEN: ${{ github.token }}
       - name: Upload selected destinations
         run: ./scripts/upload-release.sh "$RELEASE_TAG" "${{ inputs.upload_s3 }}" "${{ inputs.upload_oss }}" "${{ inputs.update_latest }}"
       - name: Notify Feishu
-        if: always() && secrets.FEISHU_WEBHOOK_TOKEN != ''
+        if: always()
         uses: ./.github/actions/feishu-notify
         with:
           webhook_token: ${{ secrets.FEISHU_WEBHOOK_TOKEN }}

@@ -29,9 +29,10 @@ jobs:
           gh release upload "$RELEASE_TAG" release-assets/*
           gh release edit "$RELEASE_TAG" --draft=false
       - name: Notify Feishu
-        if: always() && secrets.FEISHU_WEBHOOK_TOKEN != ''
+        if: always()
         uses: ./.github/actions/feishu-notify
-        env: {FEISHU_WEBHOOK_TOKEN: ${{ secrets.FEISHU_WEBHOOK_TOKEN }}}
+        env:
+          FEISHU_WEBHOOK_TOKEN: ${{ secrets.FEISHU_WEBHOOK_TOKEN }}
         with:
           webhook_token: ${{ secrets.FEISHU_WEBHOOK_TOKEN }}
           title: Release ${{ inputs.release_tag }}
